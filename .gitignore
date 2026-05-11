@@ -1,0 +1,35 @@
+# 환경변수 (API 키, DB 비밀번호)
+.env
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+*.egg-info/
+
+# Vector DB (용량 크고 로컬에서 생성 가능)
+backend/vectorstore/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# 키 파일
+*.pem
+*.key
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 로그
+*.log
