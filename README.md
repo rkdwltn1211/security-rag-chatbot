@@ -14,7 +14,7 @@
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
 
 ### 🌐 [라이브 데모 바로가기 →](http://3.26.94.252/)
-`employee1 / test1234` · `security1 / test1234` · `admin1 / test1234`
+`employee1 / employee1` · `sq / sq` · `admin1 / admin1`
 
 </div>
 
