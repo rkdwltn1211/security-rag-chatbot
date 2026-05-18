@@ -13,8 +13,8 @@
 [![AWS EC2](https://img.shields.io/badge/AWS_EC2-FF9900?style=flat-square&logo=amazonaws&logoColor=white)](https://aws.amazon.com)
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
 
-### 🌐 [라이브 데모 바로가기 →](http://3.26.94.252/)
-`employee1 / employee1` · `sq / sq` · `admin1 / admin1`
+### 🌐 [AWS EC2 배포 환경에서 실제 서비스 체험하기 →](http://3.26.94.252/)
+`employee / employee` · `sq / sq` · `admin1 / admin1`
 
 </div>
 
@@ -133,12 +133,15 @@ if state["retrieve_count"] > 0:
 
 ## 🔥 결과 및 Trouble Shooting
 
-### TS #1 · AWS EC2 OOM — 메모리 부족으로 컨테이너 강제 종료
+### TS #1 · AWS EC2 디스크 용량 고갈 — 서버 다운 및 컨테이너 응답 불가
 
-> **문제**: t2.micro(RAM 1GB) 배포 후 첫 질문 시 컨테이너가 `Killed`로 종료  
-> **원인**: ChromaDB 로딩 + BM25 전체 문서 적재 + LangGraph 상태 객체가 동시에 메모리에 올라가며 1GB 초과  
-> **해결**: t2.micro → **t2.large(RAM 8GB)** 업그레이드  
-> **학습**: 로컬과 서버의 리소스 차이를 배포 전 반드시 고려해야 함. 근본 개선으로 BM25Retriever 싱글턴 패턴 적용 예정
+> **문제**: AWS EC2 인스턴스 배포 후, 첫 질문 요청 시 컨테이너가 응답 없이 종료되거나 먹통이 되는 현상 반복 발생. 로그 확인 시 `Killed` 또는 파일 쓰기 실패 메시지 감지.
+>  
+> **원인**: 초기 EC2 인스턴스의 기본 EBS 볼륨 크기(8GB)가 RAG 시스템의 대용량 데이터를 감당하기에 부족했음. Docker 이미지 패키지, ChromaDB의 Vectorstore 데이터, KISA PDF 원본 문서가 누적되면서 **디스크 저장 공간 고갈(No space left on device)** 발생.
+>  
+> **해결**: AWS 콘솔에서 **EBS 볼륨 크기를 증설**한 후 내부 파일 시스템 확장을 수행하였으며, `docker system prune`을 통해 불필요한 레이어 캐시를 정리하여 가용 저장 공간을 확보함.
+>  
+> **학습**: RAG 서비스 특성상 임베딩 데이터 및 소스 문서로 인해 디스크 사용량이 급증할 수 있으므로, 배포 환경 구축 시 초기 디스크 볼륨 산정과 주기적인 Docker 리소스 청소가 필수적임을 배움.
 
 ---
 
