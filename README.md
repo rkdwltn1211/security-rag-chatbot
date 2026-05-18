@@ -204,6 +204,6 @@ cd frontend && npm install && npm run dev
 
 <div align="center">
 
-**📬 문의는 GitHub Issues로 남겨주세요**
+
 
 </div>
