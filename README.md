@@ -52,7 +52,6 @@
   </tr>
 </table>
 
-> 📁 `docs/screenshots/` 폴더에 `login.png` · `dashboard.png` · `chatbot_action.png` · `chatbot_security.png` · `chatbot_blocked.png` 순서로 이미지를 추가하면 자동 표시됩니다.
 
 ---
 
