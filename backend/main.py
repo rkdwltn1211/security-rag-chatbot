@@ -3,15 +3,20 @@ from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
+from typing import Literal
+from settings import allowed_origins
+from chroma_snapshot import restore_on_startup
 from rag_chain import ask
-from database import get_db_connection, create_users_table, create_user, save_log, get_user
-from auth import hash_password, verify_password, create_access_token, get_current_user
+from database import get_db_connection, create_users_table, create_chat_logs_table, create_user, save_log, get_user
+from auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
 import uvicorn
 
 # 서버 시작 시 테이블 생성
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     create_users_table()
+    create_chat_logs_table()
+    restore_on_startup()
     print("✅ 서버 시작 완료")
     yield
 
@@ -26,9 +31,7 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173",
-                   "http://localhost",  # Docker 컨테이너에서 접근할 
-                   "http://localhost:80"], # Docker 컨테이너에서 접근할 때
+    allow_origins=allowed_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -47,7 +50,10 @@ class AnswerResponse(BaseModel):
 class RegisterRequest(BaseModel):
     username: str
     password: str
-    role: str = "EMPLOYEE"
+
+
+class RoleRequest(BaseModel):
+    role: Literal['EMPLOYEE', 'SECURITY', 'ADMIN']
 
 # 헬스체크
 @app.get("/")
@@ -61,8 +67,24 @@ def register(request: RegisterRequest):
     if existing:
         raise HTTPException(status_code=400, detail="이미 존재하는 아이디입니다.")
     hashed = hash_password(request.password)
-    create_user(request.username, hashed, request.role)
+    create_user(request.username, hashed, 'EMPLOYEE')
     return {"message": f"{request.username} 회원가입 완료!"}
+
+
+@app.patch('/admin/users/{username}/role')
+def change_role(username: str, request: RoleRequest, admin: dict = Depends(require_admin)):
+    if username == admin['username'] and request.role != 'ADMIN':
+        raise HTTPException(status_code=400, detail='자신의 관리자 권한은 해제할 수 없습니다.')
+    conn = get_db_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute('UPDATE users SET role=%s WHERE username=%s', (request.role, username))
+                if cur.rowcount == 0:
+                    raise HTTPException(status_code=404, detail='사용자를 찾을 수 없습니다.')
+    finally:
+        conn.close()
+    return {'username': username, 'role': request.role}
 
 # 로그인
 @app.post("/login")
@@ -118,12 +140,16 @@ def get_logs(current_user: dict = Depends(get_current_user)):
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        cur.execute("""
+        query = """
             SELECT id, question, answer, sources, created_at
             FROM chat_logs
-            ORDER BY created_at DESC
-            LIMIT 20
-        """)
+        """
+        params = ()
+        if current_user['role'] != 'ADMIN':
+            query += ' WHERE username = %s'
+            params = (current_user['username'],)
+        query += ' ORDER BY created_at DESC LIMIT 20'
+        cur.execute(query, params)
         rows = cur.fetchall()
         cur.close()
         conn.close()
@@ -142,9 +168,7 @@ def get_logs(current_user: dict = Depends(get_current_user)):
 
 # 대시보드 API (ADMIN만 접근 가능)
 @app.get("/dashboard")
-def get_dashboard(current_user: dict = Depends(get_current_user)):
-    if current_user["role"] != "ADMIN":
-        raise HTTPException(status_code=403, detail="ADMIN 권한이 필요합니다.")
+def get_dashboard(current_user: dict = Depends(require_admin)):
     
     try:
         conn = get_db_connection()

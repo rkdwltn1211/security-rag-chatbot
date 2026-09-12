@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv
+from settings import chroma_directory
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_chroma import Chroma
 from langchain_community.retrievers import BM25Retriever
@@ -8,7 +8,6 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict
 from langchain_core.documents import Document
 
-load_dotenv()
 
 llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
@@ -32,7 +31,7 @@ class GraphState(TypedDict):
 def load_vectorstore():
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     vectorstore = Chroma(
-        persist_directory="vectorstore",
+        persist_directory=chroma_directory(),
         embedding_function=embeddings
     )
     return vectorstore

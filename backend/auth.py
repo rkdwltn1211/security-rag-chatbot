@@ -5,11 +5,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from database import get_user
 import os
-from dotenv import load_dotenv
-load_dotenv()
+import settings
 
 # 설정
-SECRET_KEY = os.getenv("SECRET_KEY", "security-rag-secret-key-2024")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY or not SECRET_KEY.strip():
+    raise RuntimeError("SECRET_KEY is required; configure it before starting the server")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -50,3 +51,9 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     if user is None:
         raise credentials_exception
     return user
+
+
+def require_admin(current_user: dict = Depends(get_current_user)):
+    if current_user['role'] != 'ADMIN':
+        raise HTTPException(status_code=403, detail='ADMIN 권한이 필요합니다.')
+    return current_user

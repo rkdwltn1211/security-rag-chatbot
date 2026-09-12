@@ -1,3 +1,5 @@
+> 로컬/운영 환경변수 분리, Chroma 재시작 복구, 무료 배포 후보 및 npm 취약점 판단은 [배포 가이드](DEPLOYMENT.md)를 참고하세요. docker-compose.yml은 로컬 개발용입니다.
+
 <div align="center">
 
 # 🔐 기업 IT 보안 정책 AI 어시스턴트
@@ -14,7 +16,6 @@
 [![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com)
 
 ### 🌐 [AWS EC2 배포 환경에서 실제 서비스 체험하기 →](http://3.26.94.252/)
-`employee / employee` · `sq / sq` · `admin1 / admin1`
 
 </div>
 
@@ -183,21 +184,130 @@ security-rag/
 ## 🚀 실행 방법
 
 **Docker (권장)**
+루트 `.env`에 `OPENAI_API_KEY`, `DB_HOST`, `DB_PORT`, `DB_USER`,
+`DB_PASSWORD`, `DB_NAME`, `SECRET_KEY`를 설정합니다. `.env.example`을
+참고하고, 실제 `.env`는 Git에 추가하지 않습니다.
+
+Docker에서는 백엔드의 DB 주소를 Compose가 `db:5432`로 지정합니다.
+로컬 실행용 `.env`의 `DB_HOST=localhost`를 그대로 두어도 됩니다.
+
 ```bash
-docker compose up -d
+docker compose up -d db
+docker compose run --rm backend python ingest.py  # 최초 1회, OpenAI API 사용
+docker compose up -d --build
 # → http://localhost
 ```
 
-**로컬 실행**
-```bash
-# 백엔드
-cd backend && pip install -r requirements.txt
-python ingest.py   # PDF 임베딩 (최초 1회)
-python main.py     # → http://localhost:8001
+**Windows 로컬 실행 (PowerShell)**
 
-# 프론트엔드
-cd frontend && npm install && npm run dev
-# → http://localhost:5173
+Python 3.11(Docker 기준) 또는 3.12, Node.js 22.13 이상인 22.x 또는
+24.x, npm, PostgreSQL 15를 준비합니다. PostgreSQL에 `.env`의
+`DB_NAME`과 일치하는 데이터베이스 및 접속 계정을 먼저 생성해야 합니다.
+서버 시작 시 `users`, `chat_logs` 테이블이 생성되며, 기존 `chat_logs`에
+`username` 컬럼이 없으면 추가됩니다. 과거 로그의 사용자명은 복원되지 않습니다.
+
+프로젝트 루트에서:
+
+```powershell
+py -3.12 -m venv venv
+.\venv\Scripts\python.exe -m pip install -r backend/requirements.txt
+.\venv\Scripts\python.exe backend/setup_ocr.py # 한국어/영어 OCR 언어 데이터 최초 설치
+$env:DB_HOST = 'localhost' # 이 프로세스에서만 적용, .env 파일은 변경하지 않음
+.\venv\Scripts\python.exe backend/ingest.py # 최초 1회, OpenAI API 사용
+.\venv\Scripts\python.exe -m uvicorn main:app --app-dir backend --host 127.0.0.1 --port 8001
+```
+
+별도 터미널에서 프론트엔드 폴더로 이동한 뒤:
+
+```powershell
+npm.cmd ci
+npm.cmd run dev -- --port 5173 --strictPort
+```
+
+화면: http://localhost:5173 / API 문서: http://localhost:8001/docs
+
+새 DB에서는 회원가입 후 로그인합니다. 계정은 자동 생성되지 않습니다. 관리자 대시보드는 `ADMIN` 계정이 필요합니다.
+
+**가입·관리자·로그 권한**
+
+일반 `/register` 요청은 `role`을 보내도 항상 `EMPLOYEE`로 생성됩니다.
+최초 관리자는 운영자가 로컬 콘솔에서 기존 가입 계정에 한해 지정합니다.
+관리자가 이미 있으면 이 명령은 거부됩니다.
+
+```powershell
+.\venv\Scripts\python.exe backend/bootstrap_admin.py <가입한_아이디>
+```
+
+그 이후 역할 변경은 관리자 토큰으로
+`PATCH /admin/users/{username}/role`에
+`{"role":"EMPLOYEE"}`, `{"role":"SECURITY"}` 또는 `{"role":"ADMIN"}`을 보냅니다.
+일반 사용자는 호출할 수 없고 관리자는 자신의 관리자 권한을 해제할 수 없습니다.
+`/logs`는 EMPLOYEE/SECURITY에게 본인 로그만, ADMIN에게 전체 로그를 반환합니다.
+관리자 대시보드는 ADMIN만 접근할 수 있습니다.
+
+**운영 환경 설정**
+
+`SECRET_KEY` 기본값은 없으며 누락·빈 값이면 서버 시작을 거부합니다.
+기존 공개 코드의 기본 시크릿을 사용했다면 별도의 강한 무작위 값으로 직접 교체해야 합니다.
+`APP_ENV=production`에서는 `CORS_ORIGINS`를 쉼표로 구분한 HTTPS origin으로
+반드시 지정합니다(예: `https://app.example.com`). 경로·와일드카드는 허용하지 않습니다.
+로컬 기본 CORS는 localhost의 5173/80만 허용합니다.
+
+프론트엔드 개발 실행은 `VITE_API_URL`이 없으면 `http://localhost:8001`을 사용합니다.
+운영 빌드는 `VITE_API_URL`을 반드시 지정하며 외부 API 주소는 HTTPS여야 합니다.
+프론트엔드 폴더의 `.env` 또는 빌드 프로세스 환경변수로 지정합니다.
+루트 `.env`의 값은 Docker Compose에서 빌드 인자로 전달합니다.
+
+```powershell
+$env:VITE_API_URL = 'https://api.example.com'
+npm.cmd run build
+```
+
+로컬 API 포트는 8001로 통일합니다. 이전 사용자/샌드박스 계정이 시작한 서버가
+점유하면 해당 소유자 또는 관리자가 종료한 뒤 같은 Windows 사용자로 다시 시작합니다.
+포트가 열려 있다는 사실만으로 외부 API 통신까지 가능한 것은 아닙니다.
+
+보안 설정/권한 회귀 테스트:
+
+```powershell
+$env:RUN_DB_TESTS = '1'
+.\venv\Scripts\python.exe -m unittest discover -s backend -p test_security.py -v
+```
+
+PDF 임베딩이 완료되지 않은 상태에서는 질문 검색이 정상 작동하지 않습니다.
+Windows에서 PyMuPDF 1.27.2.3 DLL이 차단되던 문제는 1.28.2 업데이트로
+해결했습니다. requirements.txt에 지정된 버전을 사용합니다.
+
+**이미지/스캔 PDF의 OCR fallback**
+
+PyMuPDF의 기본 텍스트 추출을 먼저 수행하고, 공백을 제외한 텍스트가
+40자 미만이며 이미지 또는 도형이 있는 페이지만 300 DPI, `kor+eng`로
+OCR 처리합니다. 빈 페이지와 짧은 텍스트만 있는 페이지는 OCR하지 않습니다.
+OCR 결과가 기존 텍스트보다 짧으면 기존 텍스트를 유지합니다.
+
+현재 PyMuPDF wheel에 포함된 OCR 엔진을 사용하므로 별도 Python OCR
+패키지나 Windows Tesseract 실행 파일은 필요하지 않습니다. `setup_ocr.py`는
+공식 `tesseract-ocr/tessdata_fast` 4.1.0의 한국어·영어 모델을 SHA-256으로
+검증한 뒤 `backend/.tessdata`에 설치합니다. 이 폴더는 Git에서 제외합니다.
+다른 언어 데이터 위치를 사용하려면 `TESSDATA_PREFIX`로 지정할 수 있습니다.
+Docker 이미지는 빌드 시 같은 설치 스크립트를 실행합니다.
+
+OCR 결과도 기존 500자/50자 겹침 분할과 동일한 임베딩 모델을 사용하며,
+출처 파일명·원본 페이지 번호·권한 메타데이터를 유지합니다. 재수집 시
+동일 청크는 다시 추가하지 않고, 변경된 청크가 모두 저장된 뒤 해당 문서의
+오래된 청크를 정리합니다. 전체 PDF 수집이 끝난 뒤 백엔드를 재시작하세요.
+
+OCR/저장 회귀 테스트:
+
+```powershell
+.\venv\Scripts\python.exe -m unittest discover -s backend -p test_ingest.py -v
+```
+
+DB 회귀 테스트(테스트 전용 임시 스키마를 생성하고 종료 시 삭제):
+
+```powershell
+$env:RUN_DB_TESTS = '1'
+.\venv\Scripts\python.exe -m unittest discover -s backend -p test_database.py -v
 ```
 
 ---

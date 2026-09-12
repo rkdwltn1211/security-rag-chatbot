@@ -8,28 +8,31 @@ function Dashboard({ token, onBack }) {
 
 
 
-  const fetchDashboard = async () => {
+  useEffect(() => {
+    const controller = new AbortController()
+    const fetchDashboard = async () => {
     try {
       const res = await fetch(`${API_URL}/dashboard`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { "Authorization": `Bearer ${token}` },
+        signal: controller.signal,
       })
       const json = await res.json()
+      if (controller.signal.aborted) return
       if (!res.ok) {
         setError(json.detail || "데이터 불러오기 실패")
         return
       }
       setData(json)
     } catch (e) {
-      void e
+      if (e.name === 'AbortError' || controller.signal.aborted) return
       setError("서버 연결 실패")
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) setLoading(false)
     }
-  }
-
-    useEffect(() => {
-        fetchDashboard()
-     }, [ ])
+    }
+    fetchDashboard()
+    return () => controller.abort()
+  }, [token])
 
   if (loading) return (
     <div style={styles.center}>

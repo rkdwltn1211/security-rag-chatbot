@@ -2,6 +2,11 @@
 .env
 backend/.env
 frontend/.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+*.snapshot.json.gz
 
 # Python
 __pycache__/
@@ -14,6 +19,7 @@ venv/
 
 # Vector DB (용량 크고 로컬에서 생성 가능)
 backend/vectorstore/
+backend/.tessdata/
 
 # Node
 frontend/node_modules/
@@ -33,3 +39,10 @@ Thumbs.db
 
 # 로그
 *.log
+
+# Local Codex reports and temporary verification artifacts
+/outputs/
+/work/
+.pytest_cache/
+.coverage
+htmlcov/

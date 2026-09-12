@@ -1,5 +1,6 @@
 
 
+# Local development only. Production setup: DEPLOYMENT.md.
 services:
   db:
     image: postgres:15
@@ -11,6 +12,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   backend:
     build: ./backend
@@ -18,20 +24,27 @@ services:
       - "8001:8001"
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - DB_HOST=${DB_HOST}
+      - DB_HOST=db
       - DB_NAME=${DB_NAME}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
-      - DB_PORT=${DB_PORT}
+      - DB_PORT=5432
       - SECRET_KEY=${SECRET_KEY}
+      - APP_ENV=development
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173,http://localhost,http://localhost:80}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     volumes:
       - ./backend/data:/app/data
       - ./backend/vectorstore:/app/vectorstore
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+        BUILD_MODE: development
     ports:
       - "80:80"
     depends_on:
