@@ -4,12 +4,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import Literal
+from threading import BoundedSemaphore
 from settings import allowed_origins
 from chroma_snapshot import restore_on_startup
-from rag_chain import ask
 from database import get_db_connection, create_users_table, create_chat_logs_table, create_user, save_log, get_user
 from auth import hash_password, verify_password, create_access_token, get_current_user, require_admin
 import uvicorn
+
+# A single worker can still execute sync endpoints in parallel threads.
+# Serialize the memory-heavy RAG section; login/dashboard remain independent.
+rag_slot = BoundedSemaphore(1)
 
 # 서버 시작 시 테이블 생성
 @asynccontextmanager
@@ -17,6 +21,9 @@ async def lifespan(app: FastAPI):
     create_users_table()
     create_chat_logs_table()
     restore_on_startup()
+    # Avoid overlapping RAG imports/client initialization with snapshot restore.
+    from rag_chain import ask
+    app.state.rag_ask = ask
     print("✅ 서버 시작 완료")
     yield
 
@@ -107,7 +114,8 @@ def ask_question(request: QuestionRequest, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=400, detail="질문을 입력해주세요")
 
     try:
-        result = ask(request.question, user_role=current_user["role"])
+        with rag_slot:
+            result = app.state.rag_ask(request.question, user_role=current_user["role"])
         answer = result["answer"]
         sources = result["sources"]
         question_type = result["question_type"]
