@@ -75,3 +75,18 @@ class StartupHttpTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'invalid snapshot'):
                 with TestClient(main.app):
                     self.fail('Server must not accept traffic')
+
+
+class ErrorPrivacyTests(unittest.TestCase):
+    def test_internal_error_details_are_not_returned(self):
+        sentinel = 'test-only-sensitive-error-detail'
+        user = {'username': 'test-user', 'role': 'ADMIN'}
+        with patch.object(main.app.state, 'rag_ask', side_effect=RuntimeError(sentinel), create=True), \
+             patch.object(main, 'get_db_connection', side_effect=RuntimeError(sentinel)):
+            calls = [lambda: main.ask_question(main.QuestionRequest(question='test'), user),
+                     lambda: main.get_logs(user), lambda: main.get_dashboard(user)]
+            for call in calls:
+                with self.assertRaises(main.HTTPException) as error:
+                    call()
+                self.assertEqual(error.exception.status_code, 500)
+                self.assertNotIn(sentinel, error.exception.detail)

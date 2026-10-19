@@ -9,7 +9,6 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "")
   const [username, setUsername] = useState(localStorage.getItem("username") || "")
   const [role, setRole] = useState(localStorage.getItem("role") || "")
-  console.log("token 값:", token)
   const [question, setQuestion] = useState("")
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(false)

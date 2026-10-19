@@ -139,8 +139,8 @@ def ask_question(request: QuestionRequest, current_user: dict = Depends(get_curr
             answer=answer,
             sources=sources
         )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="요청 처리 중 오류가 발생했습니다.") from None
 
 # 로그 조회 (로그인 필요)
 @app.get("/logs")
@@ -171,8 +171,8 @@ def get_logs(current_user: dict = Depends(get_current_user)):
             }
             for row in rows
         ]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="요청 처리 중 오류가 발생했습니다.") from None
 
 # 대시보드 API (ADMIN만 접근 가능)
 @app.get("/dashboard")
@@ -239,8 +239,8 @@ def get_dashboard(current_user: dict = Depends(require_admin)):
             "recent_logs": recent_logs
         }
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="요청 처리 중 오류가 발생했습니다.") from None
 
 
 

@@ -83,7 +83,7 @@ def create_user(username: str, hashed_password: str, role: str = "EMPLOYEE"):
     conn.commit()
     cur.close()
     conn.close()
-    print(f"✅ 유저 생성 완료: {username} ({role})")
+    print("✅ 유저 생성 완료")
 
 # 로그 저장
 def save_log(question, answer, sources, question_type, is_valid, retry_count, retrieve_count, username="anonymous"):

@@ -72,7 +72,7 @@ DEFINITION: 용어나 개념의 정의를 묻는 질문
     if judge in ["ACTION", "POLICY", "DEFINITION"]:
         question_type = judge
     else:
-        print(f"⚠️ 분류 실패: {judge}")
+        print("⚠️ 분류 실패: 기본 유형 사용")
         question_type = "POLICY"  # 안전 fallback
     
     print(f"질문 유형: {question_type}")
@@ -106,7 +106,7 @@ def retrieve(state: GraphState) -> GraphState:
         rewrite_chain = rewrite_prompt | llm
         rewritten = rewrite_chain.invoke({"question": state["question"]})
         question = rewritten.content.strip()
-        print(f"재작성된 질문: {question}")
+        print("질문 재작성 완료")
 
     # 벡터 검색
     vectorstore = load_vectorstore()
@@ -380,7 +380,5 @@ def ask(question: str, user_role: str = "EMPLOYEE") -> dict:
 # 테스트
 if __name__ == "__main__":
     question = "오늘 점심이 뭘까?" 
-    print(f"\n질문: {question}\n")
     result = ask(question)
-    print(f"\n최종 답변:\n{result['answer']}")
-    print(f"\n📚 출처:\n{result['sources']}")
+    print("RAG 테스트 완료")
